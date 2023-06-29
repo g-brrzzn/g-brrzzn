@@ -1,6 +1,7 @@
 ## Gabriel B
-- System Development Student<br>
-- IT Technician
+- System Development Student</br>
+- IT Technician</br>
+(I've lost lots of personal projects from 2020-2022 due to a data corruption on my HD)</br>
 <div style="display: inline_block;" align="center">
 <img align="center" alt="C" height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/c/c-original.svg">
 <img align="center" alt="CPlusPlus" height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/cplusplus/cplusplus-original.svg">
