@@ -1,6 +1,5 @@
 ## Gabriel B
 <div style="display: inline_block;" align="center">
-<img align="center" alt="C"         height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/c/c-plain.svg">
 <img align="center" alt="CPlusPlus" height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/cplusplus/cplusplus-plain.svg">
 <img align="center" alt="CSharp"    height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/csharp/csharp-plain.svg">
 <img align="center" alt="Python"    height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg">
