@@ -95,7 +95,7 @@ def sky(t, rng, region=(480, 30, 870, 200), orb=(800, 150, 55)):
 
 
 # ---------------------------------------------------------- estilo: cidade
-def city(cells, peak, t, proj="iso", base=True, gap=0.12, seed=1, layout="strip"):
+def city(cells, peak, t, proj="iso", base=True, gap=0.12, seed=1, layout="strip", street_color=None, variety=False):
     pj = PROJ[proj]
     (exx, exy), (eyx, eyy), ez = pj["ex"], pj["ey"], pj["ez"]
     rng = random.Random(seed)
@@ -128,7 +128,8 @@ def city(cells, peak, t, proj="iso", base=True, gap=0.12, seed=1, layout="strip"
     th = 22
 
     # centraliza automaticamente na tela
-    corners = [(x, y, z) for x in (-0.6, GX + .6) for y in (-0.6, GY + .6) for z in (-th, 0)]
+    front = 1.4 if layout == "districts" else .6   # room for the last row's street name
+    corners = [(x, y, z) for x in (-0.6, GX + .6) for y in (-0.6, GY + front) for z in (-th, 0)]
     raw = [(x * exx + y * eyx, x * exy + y * eyy - z * ez) for x, y, z in corners]
     minx, maxx = min(p[0] for p in raw), max(p[0] for p in raw)
     miny, maxy = min(p[1] for p in raw) - 120 * ez, max(p[1] for p in raw)
@@ -140,12 +141,21 @@ def city(cells, peak, t, proj="iso", base=True, gap=0.12, seed=1, layout="strip"
 
     out = []
     if base:
-        g = [(-0.6, -0.6), (GX + 0.6, -0.6), (GX + 0.6, GY + .6), (-0.6, GY + .6)]
+        g = [(-0.6, -0.6), (GX + 0.6, -0.6), (GX + 0.6, GY + front), (-0.6, GY + front)]
         out += box_faces(pt, g, -th, 0, t["ground_l"], t["ground_r"], t["ground"], stroke)
         if layout == "districts":
             for x0, y0, x1, y1 in blocks:
                 out += box_faces(pt, [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], 0, 3,
                                  t["ground_l"], t["ground_r"], t["grid"] if not t["grid"].endswith("44") else t["ground_l"], stroke)
+            # street names painted on the road in front of each district (drawn before buildings,
+            # so a tall building in front can hide part of it, like a real street)
+            if street_color:
+                n_ex, n_ey = math.hypot(exx, exy), math.hypot(eyx, eyy)
+                for (x0, y0, x1, y1), m in zip(blocks, months):
+                    sx, sy = pt(x0 + .25, y1 + .78)
+                    name = dt.date.fromisoformat(m + "-01").strftime("%b %Y").upper()
+                    out.append(f'<text transform="matrix({exx / n_ex:.3f},{exy / n_ex:.3f},{eyx / n_ey:.3f},{eyy / n_ey:.3f},{sx:.1f},{sy:.1f})" '
+                               f'font-size="9.5" font-weight="700" letter-spacing="1" fill="{street_color}">{name}</text>')
         else:
             for w in range(GX + 1):
                 a, b = pt(w - gap / 2, -0.5), pt(w - gap / 2, GY + .5)
@@ -165,11 +175,68 @@ def city(cells, peak, t, proj="iso", base=True, gap=0.12, seed=1, layout="strip"
                 out.append(poly([pt(*p) for p in fp], t["ground"], f' stroke="{t["grid"]}" stroke-width=".5"'))
             continue
         h = 6 + 114 * math.sqrt(c["n"] / peak)
-        out += box_faces(pt, fp, z0, z0 + h, t["wall_l"], t["wall_r"], t["roofs"][c["lv"] - 1], stroke,
-                         windows=(rng, t["win"]))
-        c["top"] = pt(c["gx"] + .5, c["gy"] + .5, z0 + h)
+        roof = t["roofs"][c["lv"] - 1]
+        if not variety:
+            out += box_faces(pt, fp, z0, z0 + h, t["wall_l"], t["wall_r"], roof, stroke, windows=(rng, t["win"]))
+            c["top"] = pt(c["gx"] + .5, c["gy"] + .5, z0 + h)
+            continue
+        r = random.Random(c["date"])          # per-day seed: a building keeps its look every day
+        win = (r, t["win"])
+        kind = building_kind(c["lv"], h, r)
+        if r.random() < .3:                   # some lots are narrower
+            k = .07
+            fp = [(w0 + k, d0 + k), (w1 - k, d0 + k), (w1 - k, d1 - k), (w0 + k, d1 - k)]
+        top = z0 + h
+        if kind == "setback":                 # wedding-cake tower with antenna
+            mid = z0 + h * .62
+            out += box_faces(pt, fp, z0, mid, t["wall_l"], t["wall_r"], t["roofs"][max(0, c["lv"] - 2)], stroke, windows=win)
+            ins = inset(fp, .2)
+            out += box_faces(pt, ins, mid, top, t["wall_l"], t["wall_r"], roof, stroke, windows=win)
+            cx, cy = c["gx"] + .5, c["gy"] + .5
+            a, b = pt(cx, cy, top), pt(cx, cy, top + 16)
+            out.append(f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{t["wall_l"]}" stroke-width="1.2"/>'
+                       f'<circle cx="{b[0]:.1f}" cy="{b[1]:.1f}" r="1.6" fill="{t["roofs"][3]}" class="bl"/>')
+            top += 16
+        elif kind == "hip":                   # small house with a pyramid roof
+            out += box_faces(pt, fp, z0, top, t["wall_l"], t["wall_r"], roof, stroke, windows=None)
+            out += hip_roof(pt, fp, top, 5, roof, t["roofs"][max(0, c["lv"] - 2)], stroke)
+            top += 5
+        else:
+            out += box_faces(pt, fp, z0, top, t["wall_l"], t["wall_r"], roof, stroke, windows=win)
+            if kind == "ac":                  # rooftop unit
+                u = r.choice((.15, .5))
+                box = [(w0 + u, d0 + .2), (w0 + u + .3, d0 + .2), (w0 + u + .3, d0 + .5), (w0 + u, d0 + .5)]
+                out += box_faces(pt, box, top, top + 3, t["wall_l"], t["wall_r"], t["roofs"][max(0, c["lv"] - 2)], stroke)
+        c["top"] = pt(c["gx"] + .5, c["gy"] + .5, top)
     city.meta = dict(pt=pt, blocks=blocks, months=months)
     return out
+
+
+def building_kind(lv, h, r):
+    if lv == 4 and h > 55:
+        return "setback" if r.random() < .75 else "flat"
+    if lv == 1:
+        return "hip" if r.random() < .55 else "flat"
+    return "ac" if r.random() < .45 else "flat"
+
+
+def inset(fp, k):
+    (x0, y0), (x1, _), (_, y1) = fp[0], fp[1], fp[2]
+    return [(x0 + k, y0 + k), (x1 - k, y0 + k), (x1 - k, y1 - k), (x0 + k, y1 - k)]
+
+
+def hip_roof(pt, fp, z, rh, c_front, c_back, stroke=""):
+    cx = sum(p[0] for p in fp) / 4
+    cy = sum(p[1] for p in fp) / 4
+    apex = pt(cx, cy, z + rh)
+    tris = []
+    for i in range(4):
+        a, b = fp[i], fp[(i + 1) % 4]
+        A, B = pt(*a, z), pt(*b, z)
+        depth = (A[1] + B[1]) / 2           # nearer faces are lower on screen: draw them last
+        col = c_front if depth > apex[1] + 2 else c_back
+        tris.append((depth, f'<path d="M{A[0]:.1f},{A[1]:.1f}L{B[0]:.1f},{B[1]:.1f}L{apex[0]:.1f},{apex[1]:.1f}Z" fill="{col}"{stroke}/>'))
+    return [p for _, p in sorted(tris)]
 
 
 def box_faces(pt, fp, z0, z1, cl, cr, ctop, stroke="", windows=None):

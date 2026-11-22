@@ -149,7 +149,8 @@ def hero(cells, peak, kind="base", W=900, H=560):
     if wire:
         t.update(wall_l="#000", wall_r="#000", ground="#000", ground_l="#000", ground_r="#000",
                  roofs=["#03200c", "#0b4d1e", "#119c3a", "#39ff6a"], wire="#1fcf4c", grid="#0f3d1a")
-    city = viz.city(cells, peak, t, layout="districts", proj="iso_s" if H < 650 else "iso")
+    city = viz.city(cells, peak, t, layout="districts", proj="iso_s" if H < 650 else "iso",
+                    street_color=G["txt"] if kind in ("hud", "wire") else None, variety=True)
     meta = viz.city.meta
     tops = [c["top"] for c in cells if c.get("top")]
     skyline_y = min(y for _, y in tops)
@@ -194,22 +195,21 @@ def hero(cells, peak, kind="base", W=900, H=560):
     else:
         peak_label = ""
     if kind in ("hud", "wire"):
-        # month labels floating over each district
-        pt = meta["pt"]
-        for (x0, y0, x1, y1), m in zip(meta["blocks"], meta["months"]):
-            sx, sy = pt(x0 + .2, y1 + .9, 0)
-            name = dt.date.fromisoformat(m + "-01").strftime("%b").upper()
-            body.append(f'<text x="{sx:.0f}" y="{sy + 4:.0f}" font-size="10" font-weight="700" fill="{G["mid"]}" letter-spacing="1">{name}</text>')
-        # today's building pulses
-        today = [c for c in cells if c.get("top")][-1]
-        x, y = today["top"]
+        # most recent active day pulses (month names are painted on the streets by viz.city)
+        last = [c for c in cells if c.get("top")][-1]
+        x, y = last["top"]
+        when = "today" if last["date"] == dt.date.today().isoformat() else dt.date.fromisoformat(last["date"]).strftime("%b %d")
         body.append(f'<circle cx="{x}" cy="{y}" r="3.5" fill="{G["hi"]}" class="pulse"/>'
-                    f'<text x="{x + 8:.0f}" y="{y - 8:.0f}" font-size="9" fill="{G["mid"]}">latest</text>')
+                    f'<line x1="{x + 3}" y1="{y - 3}" x2="{x + 14}" y2="{y - 14}" stroke="{G["mid"]}" stroke-width=".7"/>'
+                    f'<text x="{x + 17:.0f}" y="{y - 16:.0f}" font-size="9" fill="{G["mid"]}">last commit · {when}</text>')
 
-    tot = sum(c["n"] for c in cells)
-    act = sum(1 for c in cells if c["n"])
+    shown = [c for c in cells if c.get("gx") is not None]       # the 12 calendar months on screen
+    tot = sum(c["n"] for c in shown)
+    act = sum(1 for c in shown if c["n"])
+    span = (dt.date.fromisoformat(meta["months"][0] + "-01").strftime("%b %Y") + " – " +
+            dt.date.fromisoformat(meta["months"][-1] + "-01").strftime("%b %Y"))
     hud = [peak_label, f'<text x="32" y="46" font-size="20" font-weight="700" fill="{G["txt"]}" filter="url(#glow)">~/contribution-city</text>',
-           f'<text x="32" y="70" font-size="12" fill="{G["mid"]}">{tot:,} commits · {act} active days · last 12 months</text>',
+           f'<text x="32" y="70" font-size="12" fill="{G["mid"]}">{tot:,} contributions · {act} active days · {span}</text>',
            f'<text x="32" y="{H - 28}" font-size="11" fill="{G["mid"]}">&gt; one building per day · one district per month<tspan fill="{G["txt"]}" class="cur"> █</tspan></text>']
     if kind in ("hud", "wire"):
         # terminal corner brackets

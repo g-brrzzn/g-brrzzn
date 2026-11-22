@@ -2,13 +2,10 @@ name: Update profile
 
 on:
   schedule:
-    - cron: "17 6 * * *"   # daily, 06:17 UTC
+    - cron: "17 6,18 * * *"   # twice a day: 06:17 and 18:17 UTC (03:17 and 15:17 in Brasília)
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - "tools/profile/**.py"
-      - ".github/workflows/update-profile.yml"
+    branches: [main]   # any push here; the bot's own "Refresh profile" push doesn't retrigger (GITHUB_TOKEN pushes never do)
 
 permissions:
   contents: write
