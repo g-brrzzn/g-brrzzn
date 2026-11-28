@@ -12,10 +12,15 @@ W, H = 440, 200
 
 def top6():
     nodes = json.load(open("pub.json"))["data"]["user"]["repositories"]["nodes"]
-    L = {}
+    # score = sqrt(bytes) * sqrt(repos using it): one huge repo can't drown everything else
+    # (same idea as github-readme-stats size_weight=0.5 & count_weight=0.5)
+    size, count = {}, {}
     for r in nodes:
         for e in r["languages"]["edges"]:
-            L[e["node"]["name"]] = L.get(e["node"]["name"], 0) + e["size"]
+            n = e["node"]["name"]
+            size[n] = size.get(n, 0) + e["size"]
+            count[n] = count.get(n, 0) + 1
+    L = {n: math.sqrt(size[n]) * math.sqrt(count[n]) for n in size}
     top = sorted(L.items(), key=lambda x: -x[1])[:6]
     t = sum(s for _, s in top)
     return [(n, 100 * s / t) for n, s in top]
@@ -128,20 +133,23 @@ def treemap(L):
         c2 = "#03200c" if dark else G["txt"]
         short = {"TypeScript": "TS", "JavaScript": "JS"}.get(n, n)
         pct = f"{p:.1f}%"
-        if rh >= 42:
+        roomy = rh >= 42 and rw >= 60
+        if roomy:
             fs1, fs2, y1, y2 = (12 if rw > 70 else 10), 10, 18, 32
         else:
             fs1 = fs2 = 9
             pad = (rh - 2 - 20) / 2          # center two 9px lines vertically
             y1, y2 = 1 + pad + 8, 1 + pad + 19
         cw1, cw2 = fs1 * .6, fs2 * .6       # monospace advance ~0.6em
-        label = n if len(n) * cw1 <= rw - 14 else short
-        if len(label) * cw1 > rw - 14:
-            label = label[:max(1, int((rw - 14) / cw1))]
+        room = rw - (14 if roomy else 9)  # less padding in compact blocks
+        label = n if len(n) * cw1 <= room else short
+        if len(label) * cw1 > room:
+            label = label[:max(1, int(room / cw1))]
         if rw >= 24 and rh >= 22:
-            b.append(f'<text x="{x + 7:.1f}" y="{y + y1:.1f}" font-size="{fs1}" font-weight="700" fill="{c1}">{esc(label)}</text>')
-            if len(pct) * cw2 <= rw - 14:
-                b.append(f'<text x="{x + 7:.1f}" y="{y + y2:.1f}" font-size="{fs2}" fill="{c2}">{pct}</text>')
+            px = 7 if roomy else 5
+            b.append(f'<text x="{x + px:.1f}" y="{y + y1:.1f}" font-size="{fs1}" font-weight="700" fill="{c1}">{esc(label)}</text>')
+            if len(pct) * cw2 <= room:
+                b.append(f'<text x="{x + px:.1f}" y="{y + y2:.1f}" font-size="{fs2}" fill="{c2}">{pct}</text>')
         if horiz:
             x += rw; w -= rw
         else:
